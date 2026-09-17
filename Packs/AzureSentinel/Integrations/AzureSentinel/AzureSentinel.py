@@ -626,6 +626,29 @@ def not_contains_filter(filter_property: str, filter_property_values: list) -> s
         _nc_filter = f"and ({ ' or '.join(conditions) })"
     return _nc_filter
 
+def contains_filter(filter_property: str, filter_property_values: list) -> str:
+    """
+    Create a '(contains(properties/filter_property, '{}') eq true)' Filter string,
+    when filter_property and filter_property_values are not empty.
+    Only incidents whose title contains at least one of the provided values will match.
+    """
+    _c_filter = ""
+    if filter_property and filter_property_values:
+        conditions = [f"(contains(properties/{filter_property}, '{s}') eq true)" for s in filter_property_values]
+        _c_filter = f"and ({ ' or '.join(conditions) })"
+    return _c_filter
+
+def startswith_filter(filter_property: str, filter_property_values: list) -> str:
+    """
+    Create a '(startswith(properties/filter_property, '{}') eq true)' Filter string,
+    when filter_property and filter_property_values are not empty.
+    Only incidents whose title starts with at least one of the provided prefixes will match.
+    """
+    _sw_filter = ""
+    if filter_property and filter_property_values:
+        conditions = [f"(startswith(properties/{filter_property}, '{s}') eq true)" for s in filter_property_values]
+        _sw_filter = f"and ({ ' or '.join(conditions) })"
+    return _sw_filter
 
 def generic_list_incident_items(
     client,
@@ -1509,6 +1532,8 @@ def fetch_incidents_lookback(
     statuses_to_fetch: list | None,
     titles_to_not_fetch: list | None = None,
     alert_product_names_to_not_fetch: list | None = None,
+    titles_to_fetch: list | None = None,
+    titles_prefix_to_fetch: list | None = None,
 ) -> list:
     """Fetch incidents that were modified within the lookback window.
 
@@ -1522,6 +1547,8 @@ def fetch_incidents_lookback(
         statuses_to_fetch: List of statuses to filter by.
         titles_to_not_fetch: A list of titles to not fetch.
         alert_product_names_to_not_fetch: A list of alert product names to not fetch.
+        titles_to_fetch: A list of titles to fetch exclusively.
+        titles_prefix_to_fetch: A list of title prefixes to fetch exclusively.
 
     Returns:
         List of incidents from the lookback window.
@@ -1537,6 +1564,10 @@ def fetch_incidents_lookback(
         filter_value = f"{filter_value} {not_any_filter('additionalData/alertProductNames', alert_product_names_to_not_fetch)}"
     if titles_to_not_fetch:
         filter_value = f"{filter_value} {not_contains_filter('title', titles_to_not_fetch)}"
+    if titles_to_fetch:
+        filter_value = f"{filter_value} {contains_filter('title', titles_to_fetch)}"
+    if titles_prefix_to_fetch:
+        filter_value = f"{filter_value} {startswith_filter('title', titles_prefix_to_fetch)}"
 
     command_args = {
         "filter": filter_value,
@@ -1617,6 +1648,8 @@ def fetch_incidents(
     titles_to_not_fetch: list | None = None,
     alert_product_names_to_not_fetch: list | None = None,
     look_back: int = 0,
+    titles_to_fetch: list | None = None,
+    titles_prefix_to_fetch: list | None = None,
 ) -> tuple:
     """Fetching incidents.
     Args:
@@ -1629,6 +1662,8 @@ def fetch_incidents(
         alert_product_names_to_not_fetch: A list of alert product names to not fetch.
         look_back: Lookback time in minutes. When > 0, also fetches incidents
             modified within this window to catch severity escalations.
+        titles_to_fetch: A list of titles to fetch exclusively.
+        titles_prefix_to_fetch: A list of title prefixes to fetch exclusively.
 
     Returns:
         (tuple): 1. The LastRun object updated with the last run details.
@@ -1671,6 +1706,10 @@ def fetch_incidents(
             )
         if titles_to_not_fetch:
             filter_value = f"{filter_value} {not_contains_filter('title', titles_to_not_fetch)}"
+        if titles_to_fetch:
+            filter_value = f"{filter_value} {contains_filter('title', titles_to_fetch)}"
+        if titles_prefix_to_fetch:
+            filter_value = f"{filter_value} {startswith_filter('title', titles_prefix_to_fetch)}"
         command_args = {
             "filter": filter_value,
             "orderby": "properties/createdTimeUtc asc",
@@ -1693,6 +1732,10 @@ def fetch_incidents(
             )
         if titles_to_not_fetch:
             filter_value = f"{filter_value} {not_contains_filter('title', titles_to_not_fetch)}"
+        if titles_to_fetch:
+            filter_value = f"{filter_value} {contains_filter('title', titles_to_fetch)}"
+        if titles_prefix_to_fetch:
+            filter_value = f"{filter_value} {startswith_filter('title', titles_prefix_to_fetch)}"
         command_args = {
             "filter": filter_value,
             "orderby": "properties/incidentNumber asc",
@@ -1729,6 +1772,8 @@ def fetch_incidents(
                 statuses_to_fetch=statuses_to_fetch,
                 titles_to_not_fetch=titles_to_not_fetch,
                 alert_product_names_to_not_fetch=alert_product_names_to_not_fetch,
+                titles_to_fetch=titles_to_fetch,
+                titles_prefix_to_fetch=titles_prefix_to_fetch,
             )
 
             # Dedup lookback incidents using the lookback incidents from loop before and the fetched incidents
@@ -1770,6 +1815,8 @@ def fetch_incidents_command(client, params):
     min_severity = params.get("min_severity", "Informational")
     statuses_to_fetch = argToList(params.get("statuses_to_fetch", []))
     titles_to_not_fetch = argToList(params.get("titles_to_not_fetch", []))
+    titles_to_fetch = argToList(params.get("titles_to_fetch", []))
+    titles_prefix_to_fetch = argToList(params.get("titles_prefix_to_fetch", []))
     alert_product_names_to_not_fetch = argToList(params.get("alert_product_names_to_not_fetch", []))
     look_back = arg_to_number(params.get("look_back")) or 0
     # Set and define the fetch incidents command to run after activated via integration settings.
@@ -1784,6 +1831,8 @@ def fetch_incidents_command(client, params):
         titles_to_not_fetch=titles_to_not_fetch,
         alert_product_names_to_not_fetch=alert_product_names_to_not_fetch,
         look_back=look_back,
+        titles_to_fetch=titles_to_fetch,
+        titles_prefix_to_fetch=titles_prefix_to_fetch,
     )
     demisto.debug(f"New last run is {next_run}")
     demisto.setLastRun(next_run)

@@ -249,6 +249,20 @@ configuration:
   required: false
   section: Collect
   advanced: true
+- display: Incident Titles to Fetch
+  additionalinfo: "A comma-separated list of case-sensitive titles of the incidents that will be fetched. This will also match if the title provided is contained in the incident's title. If no title is provided then all incidents will be fetched."
+  name: titles_to_fetch
+  type: 0
+  required: false
+  section: Collect
+  advanced: true
+- display: Incident Title Prefixes to Fetch
+  additionalinfo: 'A comma-separated list of case-sensitive prefixes. Only incidents whose title starts with at least one of the provided prefixes will be fetched. If no prefix is provided then this filter is not applied.'
+  name: titles_prefix_to_fetch
+  type: 0
+  required: false
+  section: Collect
+  advanced: true
 description: "Microsoft Sentinel is a scalable, cloud-native solution that provides: Security information and event management (SIEM) Security orchestration, automation, and response (SOAR)."
 display: Microsoft Sentinel
 name: Azure Sentinel
